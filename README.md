@@ -1,92 +1,104 @@
-## Overview
+# Installing SLURM
 
-Slurm overview: https://slurm.schedmd.com/overview.html
+Instructions for setting up a SLURM cluster using Ubuntu 18.04.3 with GPUs. Go from a pile of hardware to a functional GPU cluster with job queueing and user management.
 
-> Slurm is an open source, fault-tolerant, and highly scalable cluster management and job scheduling system for large and small Linux clusters. Slurm requires no kernel modifications for its operation and is relatively self-contained. As a cluster workload manager, Slurm has three key functions. First, it allocates exclusive and/or non-exclusive access to resources (compute nodes) to users for some duration of time so they can perform work. Second, it provides a framework for starting, executing, and monitoring work (normally a parallel job) on the set of allocated nodes. Finally, it arbitrates contention for resources by managing a queue of pending work. Optional plugins can be used for accounting, advanced reservation, gang scheduling (time sharing for parallel jobs), backfill scheduling, topology optimized resource selection, resource limits by user or bank account, and sophisticated multifactor job prioritization algorithms.
+OS used: Ubuntu 18.04.3 LTS
 
-This guide provides the steps to install a slurm controller node as well as a single compute node.  
-The following steps make the follwing assumptions.
-* OS: Ubuntu 16.04
-* Slurm controller node hostname: slurm-ctrl
-* Non-root user: myuser
-* Compute node hostname: linux1
-* Slurm DB Password: slurmdbpass
-* Passwordless SSH is working between slurm-ctrl and linux1
-* There is shared storage between all the nodes: /storage & /home
-* The UIDs and GIDs will be consistent between all the nodes.
-* Slurm will be used to control SSH access to compute nodes.
-* Compute nodes are DNS resolvable.
-* Compute nodes have GPUs and the latest CUDA drivers installed
+# Overview
 
-The slurm controller node (slurm-ctrl) does not need to be a physical piece of hardware.  A VM is fine.  However, this node will be used by users for compiling codes and as such it should have the same OS and libraries (such as CUDA) that exist on the compute nodes.
+This guide will help you create and install a GPU HPC cluster with a job queue and user management. The idea is to have a GPU cluster which allows use of a few GPUs by many people. Using multiple GPUs at once is not the point here, and hasn’t been tested. This guide demonstrates how to create a GPU cluster for neural networks (deep learning) which uses Python and related neural network libraries (Tensorflow, Keras, Pytorch), CUDA, and NVIDIA GPU cards. You can expect this to take you a few days up to a week.
 
-## Install slurm and associated components on slurm controller node.
-Install prerequisites 
+## Acknowledgements
 
-Ubuntu 16.04
-```console
-$ apt-get update
-$ apt-get install git gcc make ruby ruby-dev libpam0g-dev libmariadb-client-lgpl-dev libmysqlclient-dev
-$ gem install fpm
+This wouldn’t have been possible without this [github repo](https://github.com/mknoxnv/ubuntu-slurm) from mknoxnv. I don’t know who that person is, but they saved me weeks of work trying to figure out all the conf files and services, etc.
+
+# OS preparations
+
+## Synchronizing time
+
+Free-IPA should take care of syncing time, so you shouldn’t have to worry about this if you setup freeipa. You can see if times are synced with the `date` command on the various machines.
+
+It’s not a bad idea to sync the time across the servers. [Here’s how](https://knowm.org/how-to-synchronize-time-across-a-linux-cluster/). One time when I set it up, it was ok, but another time the slurmctld service wouldn’t start and it was because the times weren’t synced.
+
+## Set up munge and slurm users and groups
+
+Immediately after installing OS’s, you want to create the munge and slurm users and groups on all machines. The GID and UID (group and user IDs) must match for munge and slurm across all machines. If you have a lot of machines, you can use the parallel SSH utilities mentioned before. There are also other options like NIS and NISplus. One other option is to use FreeIPA to create users and groups.
+
+On all machines we need the munge authentication service and slurm installed. First, we want to have the munge and slurm users/groups with the same UIDs and GIDs. In my experience, these are the only GID and UIDs that need synchronization for the cluster to work. On all machines:
+
 ```
-Ubuntu 14.04
-```console
-$ apt-get update
-$ apt-get install git gcc make ruby ruby-dev libpam0g-dev libmariadbclient-dev
-$ gem install fpm
+sudo adduser -u 511 munge --disabled-password --gecos ""
+sudo adduser -u 521 slurm --disabled-password --gecos ""
 ```
 
+### You shouldn’t need to do this, but just in case, you could create the groups first, then create the users
 
-### Copy git repo
-```console
-$ cd /storage
-$ git clone https://github.com/mknoxnv/ubuntu-slurm.git
+```
+sudo addgroup -gid 511 munge
+sudo addgroup -gid 521 slurm
+sudo adduser -u 511 munge --disabled-password --gecos "" -gid 511
+sudo adduser -u 521 slurm --disabled-password --gecos "" -gid 521
 ```
 
-Customize slurm.conf with your slurm controller and compute node hostnames:
-```console
-$ vi ubuntu-slurm/slurm.conf
-ControlMachine=slurm-ctrl
-NodeName=linux1 (you can specify a range of nodes here, for example: linux[1-10])
+When a user is created, a group with the same name is created as well.
+
+The numbers don’t matter as long as they are available for the user and group IDs. These numbers seemed to work with a default Ubuntu 18.04.3 installation. It seems like by default ubuntu sets up a new user with a UID and GID of UID + 1 if the GID already exists, so this follows that pattern.
+
+# Preparing for SLURM installation
+
+## Install munge on the master:
+
+```
+sudo apt-get install libmunge-dev libmunge2 munge -y
+sudo systemctl enable munge
+sudo systemctl start munge
 ```
 
-### Install munge
-MUNGE (MUNGE Uid 'N' Gid Emporium) is an authentication service for creating and validating credentials.
-https://dun.github.io/munge/
+Test munge if you like: `munge -n | unmunge | grep STATUS`
 
-Ubuntu 16.04
-```console
-$ apt-get install libmunge-dev libmunge2 munge
-$ systemctl enable munge
-$ systemctl start munge
+Copy the munge key to /storage
+
+```
+sudo cp /etc/munge/munge.key /storage/
+sudo chown munge /storage/munge.key
+sudo chmod 400 /storage/munge.key
 ```
 
-Ubuntu 14.04
-```console
-$ apt-get install libmunge-dev libmunge2 munge
-$ create-munge-key
-$ update-rc.d munge enable
-$ service munge start
+## Install munge on worker nodes:
+
+```
+sudo apt-get install libmunge-dev libmunge2 munge
+sudo cp /storage/munge.key /etc/munge/munge.key
+sudo systemctl enable munge
+sudo systemctl start munge
 ```
 
-### Test munge
-```console
-$ munge -n | unmunge | grep STATUS
-STATUS:           Success (0)
+If you want, you can test munge: `munge -n | unmunge | grep STATUS`
+
+## Prepare DB for SLURM
+
+These instructions more or less follow this github repo: https://github.com/mknoxnv/ubuntu-slurm
+
+First we want to clone the repo: `cd /storage` `git clone https://github.com/mknoxnv/ubuntu-slurm.git`
+
+Install prereqs:
+
+```
+sudo apt-get install git gcc make ruby ruby-dev libpam0g-dev libmariadb-client-lgpl-dev libmysqlclient-dev mariadb-server build-essential libssl-dev -y
+sudo gem install fpm
 ```
 
-### Install MariaDB for Slurm accounting
-MariaDB is an open source Mysql compatible database.
-https://mariadb.org/
+Next we set up MariaDB for storing SLURM data:
 
-In the following steps change the DB password "slurmdbpass" to something secure.
+```
+sudo systemctl enable mariadb
+sudo systemctl start mariadb
+sudo mysql -u root
+```
 
-Ubuntu 16.04
-```console
-$ apt-get install mariadb-server
-$ systemctl enable mysql
-$ systemctl start mysql
-$ mysql -u root
+Within mysql:
+
+```
 create database slurm_acct_db;
 create user 'slurm'@'localhost';
 set password for 'slurm'@'localhost' = password('slurmdbpass');
@@ -96,214 +108,327 @@ flush privileges;
 exit
 ```
 
-Ubuntu 14.04
-```console
-$ apt-get install mariadb-server
-$ update-rc.d mysql enable
-$ service mysql start
-$ mysql -u root
-create database slurm_acct_db;
-create user 'slurm'@'localhost';
-set password for 'slurm'@'localhost' = password('slurmdbpass');
-grant usage on *.* to 'slurm'@'localhost';
-grant all privileges on slurm_acct_db.* to 'slurm'@'localhost';
-flush privileges;
-exit
+Copy the default db config file: `cp /storage/ubuntu-slurm/slurmdbd.conf /storage`
+
+Ideally you want to change the password to something different than `slurmdbpass`. This must also be set in the config file `/storage/slurmdbd.conf`.
+
+# Install SLURM
+
+## Download and install SLURM on Master
+
+### Build the SLURM .deb install file
+
+It’s best to check the downloads page and use the latest version (right click link for download and use in the wget command). Ideally we’d have a script to scrape the latest version and use that dynamically.
+
+You can use the -j option to specify the number of CPU cores to use for ‘make’, like `make -j12`. `htop` is a nice package that will show usage stats and quickly show how many cores you have.
+
+```
+cd /storage
+wget https://download.schedmd.com/slurm/slurm-20.11.5.tar.bz2
+tar xvjf slurm-20.11.5.tar.bz2
+cd slurm-20.11.5
+./configure --prefix=/tmp/slurm-build --sysconfdir=/etc/slurm --enable-pam --with-pam_dir=/lib/x86_64-linux-gnu/security/ --without-shared-libslurm
+make
+make contrib
+make install
+cd ..
 ```
 
-### Download, build, and install Slurm
-Download tar.bz2 from https://www.schedmd.com/downloads.php to /storage
+### Install SLURM
 
-```console
-$ cd /storage
-$ wget https://download.schedmd.com/slurm/slurm-17.11.12.tar.bz2
-$ tar xvjf slurm-17.11.12.tar.bz2
-$ cd slurm-17.11.12
-$ ./configure --prefix=/tmp/slurm-build --sysconfdir=/etc/slurm --enable-pam --with-pam_dir=/lib/x86_64-linux-gnu/security/ --without-shared-libslurm
-$ make
-$ make contrib
-$ make install
-$ cd ..
-$ fpm -s dir -t deb -v 1.0 -n slurm-17.11.12 --prefix=/usr -C /tmp/slurm-build .
-$ dpkg -i slurm-17.11.12_1.0_amd64.deb
-$ useradd slurm 
-$ mkdir -p /etc/slurm /etc/slurm/prolog.d /etc/slurm/epilog.d /var/spool/slurm/ctld /var/spool/slurm/d /var/log/slurm
-$ chown slurm /var/spool/slurm/ctld /var/spool/slurm/d /var/log/slurm
+```
+sudo fpm -s dir -t deb -v 1.0 -n slurm-20.11.5 --prefix=/usr -C /tmp/slurm-build .
+sudo dpkg -i slurm-20.11.5_1.0_amd64.deb
 ```
 
-Ubuntu 16.04
-```console
-Copy into place config files from this repo which you've already cloned into /storage
-$ cd /storage
-$ cp ubuntu-slurm/slurmdbd.service /etc/systemd/system/
-$ cp ubuntu-slurm/slurmctld.service /etc/systemd/system/
+Make all the directories we need:
+
+```
+sudo mkdir -p /etc/slurm /etc/slurm/prolog.d /etc/slurm/epilog.d /var/spool/slurm/ctld /var/spool/slurm/d /var/log/slurm
+sudo chown slurm /var/spool/slurm/ctld /var/spool/slurm/d /var/log/slurm
 ```
 
-Ubuntu 14.04
-```console
-Copy into place config files from this repo which you've already cloned into /storage
-$ cd /storage
-$ cp ubuntu-slurm/slurmd.init /etc/init.d/slurmd
-$ cp ubuntu-slurm/slurm.default /etc/default/slurm
-$ chmod 755 /etc/init.d/slurmd
-$ cp ubuntu-slurm/slurmdbd.init /etc/init.d/slurmdbd
-$ chmod 755 /etc/init.d/slurmdbd
+Copy slurm control and db services:
+
+```
+sudo cp /storage/ubuntu-slurm/slurmdbd.service /etc/systemd/system/
+sudo cp /storage/ubuntu-slurm/slurmctld.service /etc/systemd/system/
 ```
 
-Ubuntu 16.04
-```console
-$ systemctl daemon-reload
-$ systemctl enable slurmdbd
-$ systemctl start slurmdbd
-$ systemctl enable slurmctld
-$ systemctl start slurmctld
+The slurmdbd.conf file should be copied before starting the slurm services: `sudo cp /storage/slurmdbd.conf /etc/slurm/`
+
+Start the slurm services:
+
+```
+sudo systemctl daemon-reload
+sudo systemctl enable slurmdbd
+sudo systemctl start slurmdbd
+sudo systemctl enable slurmctld
+sudo systemctl start slurmctld
 ```
 
-Ubuntu 14.04
-```console
-$ update-rc.d slurmdbd start 20 3 4 5 . stop 20 0 1 6 .
-$ update-rc.d slurmd start 20 3 4 5 . stop 20 0 1 6 .
-$ service slurmdbd start
-$ service slurmd start
+If the master is also going to be a worker/compute node, you should do:
+
+```
+sudo cp /storage/ubuntu-slurm/slurmd.service /etc/systemd/system/
+sudo systemctl enable slurmd
+sudo systemctl start slurmd
 ```
 
-## Create initial slurm cluster, account, and user.
-```console
-$ sacctmgr add cluster compute-cluster
-$ sacctmgr add account compute-account description="Compute accounts" Organization=OurOrg
-$ sacctmgr create user myuser account=compute-account adminlevel=None
-$ sinfo
-PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
-debug*       up   infinite      0    n/a
+## Worker nodes
+
+Now install SLURM on worker nodes:
+
+```
+cd /storage
+sudo dpkg -i slurm-19.05.2_1.0_amd64.deb
+sudo cp /storage/ubuntu-slurm/slurmd.service /etc/systemd/system/
+sudo systemctl enable slurmd
+sudo systemctl start slurmd
 ```
 
-## Install slurm and associated components on a compute node.
+## Configuring SLURM
 
-### Install munge
-MUNGE (MUNGE Uid 'N' Gid Emporium) is an authentication service for creating and validating credentials.
-https://dun.github.io/munge/
-```console
-$ apt-get update
-$ apt-get install libmunge-dev libmunge2 munge
-$ scp slurm-ctrl:/etc/munge/munge.key /etc/munge/
-$ chown munge:munge /etc/munge/munge.key
-$ chmod 400 /etc/munge/munge.key
+Next we need to set up the configuration file. Copy the default config from the github repo:
+
+`cp /storage/ubuntu-slurm/slurm.conf /storage/slurm.conf`
+
+Note: for job limits for users, you should add the [AccountingStorageEnforce=limits](https://slurm.schedmd.com/resource_limits.html) line to the config file.
+
+Once SLURM is installed on all nodes, we can use the command
+
+`sudo slurmd -C`
+
+to print out the machine specs. Then we can copy this line into the config file and modify it slightly. To modify it, we need to add the number of GPUs we have in the system (and remove the last part which show UpTime). Here is an example of a config line:
+
+`NodeName=worker1 Gres=gpu:2 CPUs=12 Boards=1 SocketsPerBoard=1 CoresPerSocket=6 ThreadsPerCore=2 RealMemory=128846`
+
+Take this line and put it at the bottom of `slurm.conf`.
+
+Next, setup the `gres.conf` file. Lines in `gres.conf` should look like:
+
+```
+NodeName=master Name=gpu File=/dev/nvidia0
+NodeName=master Name=gpu File=/dev/nvidia1
 ```
 
-Ubuntu 16.04
-```console
-$ systemctl enable munge
-$ systemctl restart munge
+If you have multiple GPUs, keep adding lines for each node and increment the last number after nvidia.
+
+To make GPUs shareable by jobs, we need to use MPS ([https://slurm.schedmd.com/gres.html#MPS_Management](https://slurm.schedmd.com/gres.html#MPS_Management)):
+
+```
+# Example 2 of gres.conf
+# Configure support for four different GPU types (with MPS)
+AutoDetect=nvml
+Name=gpu Type=gtx1080 File=/dev/nvidia0 Cores=0,1
+Name=gpu Type=gtx1070 File=/dev/nvidia1 Cores=0,1
+Name=gpu Type=gtx1060 File=/dev/nvidia2 Cores=2,3
+Name=gpu Type=gtx1050 File=/dev/nvidia3 Cores=2,3
+Name=mps Count=1300   File=/dev/nvidia0
+Name=mps Count=1200   File=/dev/nvidia1
+Name=mps Count=1100   File=/dev/nvidia2
+Name=mps Count=1000   File=/dev/nvidia3
 ```
 
-Ubuntu 14.04
-```console
-$ update-rc.d munge enable
-$ service munge start
+(I think `Cores` binds the GPU to specific CPUs.)
+
+As far as I can tell, `MPS` refers to an arbitrary number. In the examples it's kind of like percent, but it doesn't have to be that way. I propose to use GPU memory in GB.
+
+`slurm.conf` then needs to contain something like
+
+```
+NodeName=tux[1-16] Gres=gpu:2,mps:200
 ```
 
-### Test munge
-```console
-$ munge -n | unmunge | grep STATUS
-STATUS:           Success (0)
-$ munge -n | ssh slurm-ctrl unmunge | grep STATUS
-STATUS:           Success (0)
+> For example, a job request for "--gres=mps:50" will not be satisfied by using 20 percent of one GPU and 30 percent of a second GPU on a single node. Multiple jobs from different users can use MPS on a node at the same time. Note that GRES types of GPU and MPS can not be requested within a single job.
+
+Another example for `slurm.conf`:
+
+```
+# Configure support for our four GPUs (with MPS), plus bandwidth
+GresTypes=gpu,mps
+NodeName=tux[0-7] Gres=gpu:tesla:2,gpu:kepler:2,mps:400
 ```
 
-### Install Slurm
-```console
-$ dpkg -i /storage/slurm-17.02.6_1.0_amd64.deb
-$ mkdir /etc/slurm
-$ cp /storage/ubuntu-slurm/slurm.conf /etc/slurm/slurm.conf
+Gres has more options detailed in the docs: https://slurm.schedmd.com/slurm.conf.html (near the bottom).
 
-If necessary modify gres.conf to reflect the properties of this compute node.
-gres.conf.dgx is an example configuration for the DGX-1. 
-Use "nvidia-smi topo -m" to find the GPU-CPU affinity.
+Another thing that needs to be configured in `slurm.conf` are *ports*. Specify ports that are not blocked.
 
-The node-config.sh script will, if run on the compute node, output the appropriate lines to
-add to slurm.conf and gres.conf.
+This should probably be removed: `DefMemPerNode=64000`.
 
-$ cp /storage/ubuntu-slurm/gres.conf /etc/slurm/gres.conf
-$ cp /storage/ubuntu-slurm/cgroup.conf /etc/slurm/cgroup.conf
-$ cp /storage/ubuntu-slurm/cgroup_allowed_devices_file.conf /etc/slurm/cgroup_allowed_devices_file.conf
-$ useradd slurm
-$ mkdir -p /var/spool/slurm/d
+These things might also be necessary to properly schedule GPUs: [https://github.com/dholt/slurm-gpu#scheduling-resources-at-the-per-gpu-level](https://github.com/dholt/slurm-gpu#scheduling-resources-at-the-per-gpu-level)
+
+Finally, we need to copy .conf files on **all** machines. This includes the `slurm.conf` file, `gres.conf`, `cgroup.conf` , and `cgroup_allowed_devices_file.conf`. Without these files it seems like things don’t work.
+
+```
+sudo cp /storage/ubuntu-slurm/cgroup* /etc/slurm/
+sudo cp /storage/slurm.conf /etc/slurm/
+sudo cp /storage/gres.conf /etc/slurm/
 ```
 
-Ubuntu 16.04
-```console
-$ cp /storage/ubuntu-slurm/slurmd.service /etc/systemd/system/
-$ systemctl enable slurmd
-$ systemctl start slurmd
+This directory should also be created on workers:
+
+```
+sudo mkdir -p /var/spool/slurm/d
+sudo chown slurm /var/spool/slurm/d
 ```
 
-Ubuntu 14.04
-```console
-$ cp /storage/ubuntu-slurm/slurmd.init /etc/init.d/slurmd
-$ cp /storage/ubuntu-slurm/slurm.default /etc/default/slurm
-$ chmod 755 /etc/init.d/slurmd
-$ update-rc.d slurmd start 20 3 4 5 . stop 20 0 1 6 .
-$ service slurmd start
+After the conf files have been copied to all workers and the master node, you may want to reboot the computers, or at least restart the slurm services:
+
+Workers: `sudo systemctl restart slurmd` Master:
+
+```
+sudo systemctl restart slurmctld
+sudo systemctl restart slurmdbd
+sudo systemctl restart slurmd
 ```
 
-## Test Slurm
-```console
-$ sinfo
-PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
-debug*       up   infinite      1   idle linux1
-```
+Next we just create a cluster: `sudo sacctmgr add cluster compute-cluster`
 
-### Set up cgroups
-Using memory cgroups to restrict jobs to allocated memory resources requires setting kernel parameters
-```console
-$ vi /etc/default/grub
+## Configure cgroups
+
+I think cgroups allows memory limitations from SLURM jobs and users to be implemented. Set memory cgroups on all workers with:
+
+```
+sudo nano /etc/default/grub
+And change the following variable to:
 GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"
-$ update-grub
-$ reboot
+sudo update-grub
 ```
 
-## Run a job from slurm-ctrl
-```console
-$ su - myuser
-$ srun -N 1 hostname
-linux1
+Finally at the end, I did one last `sudo apt update`, `sudo apt upgrade`, and `sudo apt autoremove`, then rebooted the computers: `sudo reboot`
+
+# Troubleshooting
+
+When in doubt, first try updating software with `sudo apt update; sudo apt upgrade -y` and rebooting (`sudo reboot`).
+
+## Log files
+
+When in doubt, you can check the log files. The locations are set in the slurm.conf file, and are `/var/log/slurmd.log` and `/var/log/slurmctld.log` by default. Open them with `sudo nano /var/log/slurmctld.log`. To go to the bottom of the file, use ctrl+_ and ctrl+v. I also changed the log paths to `/var/log/slurm/slurmd.log` and so on, and changed the permissions of the folder to be owner by slurm: `sudo chown slurm:slurm /var/log/slurm`.
+
+## Checking SLURM states
+
+Some helpful commands:
+
+`scontrol ping` – this checks if the controller node can be reached. If this isn’t working (i.e. the command returns ‘DOWN’ and not ‘UP’), you might need to allow connections to the slurmctrlport (in the slurm.conf file). This is set to 6817 in the config file. To allow connections with the firewall, execute:
+
+`sudo ufw allow from any to any port 6817`
+
+and
+
+`sudo ufw reload`
+
+## Error codes 1:0 and 2:0
+
+If trying to run a job with `sbatch` and the exit code is 1:0, this is usually a file writing error. The first thing to check is that your output and error file paths in the .job file are correct. Also check the .py file you want to run has the correct filepath in your .job file. Then you should go to the logs (`/var/log/slurm/slurmctld.log`) and see which node the job was trying to run on. Then go to that node and open the logs (`/var/log/slurm/slurmd.log`) to see what it says. It may say something about the path for the output/error files, or the path to the .py file is incorrect.
+
+It could also mean your common storage location is not r/w accessible to all nodes. In the logs, this would show up as something about permissions and unable to write to the filesystem. Double-check that you can create files on the /storage location on all workers with something like `touch testing.txt`. If you can’t create a file from the worker nodes, you probably have some sort of NFS issue. Go back to the NFS section and make sure everything looks ok. You should be able to create directories/files in /storage from any node with the admin account and they should show up as owned by the admin user. If not, you may have some issue in your /etc/exports or with your GID/UIDs not matching.
+
+If the exit code is 2:0, this can mean there is some problem with either the location of the python executable, or some other error when running the python script. Double check that the srun or python script is working as expected with the python executable specified in the sbatch job file.
+
+### Restart nodes
+
+If some workers are ‘draining’, down, or unavailable, you might try:
+
 ```
-## Run a GPU job from slurm-ctrl
-```console
-$ srun -N 1 --gres=gpu:1 env | grep CUDA
-CUDA_VISIBLE_DEVICES=0
-```
-
-## Enable Slurm PAM SSH Control
-This prevents users from ssh-ing into a compute node on which they do not have an allocation.
-
-On the compute nodes:
-```console
-$ cp /storage/slurm-17.02.6/contribs/pam/.libs/pam_slurm.so /lib/x86_64-linux-gnu/security/
-$ vi /etc/pam.d/sshd
-account    required     /lib/x86_64-linux-gnu/security/pam_slurm.so
-```
-
-If you are using something such as LDAP for user accounts and want to allow local system 
-accounts (for example, a non-root local admin account) to login without going through 
-slurm make the following change.  Add this line to the beginning of the sshd file.
-
-```console
-$ vi /etc/pam.d/sshd
-account    sufficient   pam_localuser.so
-```
-
-On slurm-ctrl as non-root user
-```console
-$ ssh linux1 hostname
-Access denied: user myuser (uid=1000) has no active jobs on this node.
-Connection to linux1 closed by remote host.
-Connection to linux1 closed.
-$ salloc -N 1 -w linux1
-$ ssh linux1 hostname
-linux1
+scontrol update nodename=YOURNODEHERE state=resume
 ```
 
+## Node is stuck draining (drng from `sinfo`)
 
+This has happened due to the memory size in slurm.conf being higher than actual memor size. Double check the memory from `free -m` or `sudo slurmd -C` and update slurm.conf on all machines in the cluster. Then run `sudo scontrol update NodeName=worker1 State=RESUME`
 
+## Nodes are not visible upon restart
 
+After restarting the master node, sometimes the workers aren’t there. I’ve found I often have to do `sudo scontrol update NodeName=worker1 State=RESUME` to get them working/available.
+
+## Taking a node offline
+
+The best way to take a node offline for maintenance is to drain it: `sudo scontrol update NodeName=worker1 State=DRAIN Reason='Maintenance'`
+
+Users can see the reason with `sinfo -R`
+
+## Testing GPU load
+
+Using `watch -n 0.1 nvidia-smi` will show the GPU load in real-time. You can use this to monitor jobs as they are scheduled to make sure all the GPUs are being utilized.
+
+## Setting account options
+
+You may want to limit jobs or submissions. Here is how to set attributes (-1 means no limit):
+
+```
+sudo sacctmgr modify account students set GrpJobs=-1sudo sacctmgr modify account students set GrpSubmitJobs=-1sudo sacctmgr modify account students set MaxJobs=-1sudo sacctmgr modify account students set MaxSubmitJobs=-1
+```
+
+## FreeIPA Troubleshooting
+
+If you can’t access the FreeIPA admin web GUI, you may try changing permissions on the Kerberos folder as noted [here](https://scattered.network/2019/04/09/freeipa-webui-login-fails-with-login-failed-due-to-an-unknown-reason/).
+
+To get the machines to talk to each other with FreeIPA, you may also need to take some or all of these steps:
+
+- [Install a DNS service on the IPA server](https://docs.fedoraproject.org/en-US/Fedora/18/html/FreeIPA_Guide/enabling-dns.html)
+- [configure it to recognize the clients](https://www.howtoforge.com/how-to-install-freeipa-client-on-ubuntu-server-1804/#step-testing-freeipa-client)
+- This may also require enabling TCP and UDP traffic on port 53, and changing the [resolv.conf file on the clients](http://clusterfrak.com/sysops/app_installs/freeipa_clients/) to recognize the new name server on the server computer
+- change the /etc/nsswitch.conf file to include the line “initgroups: files sss”, and add several instances “sss” to [other lines in this file](https://bugzilla.redhat.com/show_bug.cgi?id=1366569)
+
+# Better sacct
+
+This shows all running jobs with the user who is running them.
+
+`sacct --format=jobid,jobname,state,exitcode,user,account`
+
+More on sacct [here](https://slurm.schedmd.com/sacct.html).
+
+# Changing IPs
+
+If the IP addresses of your machines change, you will need to update these in the file `/etc/hosts` on all machines and `/etc/exports` on the master node. It’s best to restart after making these changes.
+
+# NFS directory not showing up
+
+Check the service is running on the master node: `sudo systemctl status nfs-kernel-server.service`
+
+If it is not working, you may have a syntax error in your /etc/exports file. Rebooting after getting this working is a good idea. Not a bad idea to reboot the client computers as well.
+
+Once you have the service running on the master node, then see if you can manually mount the drive on the clients:
+
+`sudo mount master:/storage /storage`
+
+If it is hanging here, try mounting on the master server:
+
+`sudo mkdir /test` `sudo mount master:/storage /test`
+
+If this works, you might have an issue with ports being blocked or other connection issues between the master and clients.
+
+You should check your firewall status with `sudo ufw status`. You should see a rule allowing port 2049 access from your worker nodes. If you don’t have it, be sure to add it with `sudo ufw allow from <ip_addr> to any port nfs` then `sudo ufw reload`. You should use the IP and not the hostname. A reference for this is here.
+
+# Node not able to connect to slurmctld
+
+If a node isn’t able to connnect to the controller (server/master), first check that time is properly synced. Try using the `date` command to see if the times are synced across the servers.
+
+# Unable to uninstall and reinstall freeipa client
+
+If you are trying to uninstall the freeipa client and reinstall it and it fails (e.g. gives an error `The ipa-client-install command failed. See /var/log/ipaclient-install.log for more information`), you can try installing it with:
+
+```
+sudo ipa-client-install --hostname=`hostname -f` \
+--mkhomedir --server=copper.regis.edu \
+--domain regis.edu --realm REGIS.EDU --force-join
+```
+
+where the domain is your FQDN instead of regis.edu and instead of ‘copper’ you should use your server’s name.
+
+You might also try removing this file instead:
+
+`sudo rm /var/lib/ipa-client/sysrestore/sysrestore.state`
+
+However, when I was having this problem, it appeared to be some issue with the LDAP and SSSD not working. I ended up reformatting and reinstalling the OS on the problem machine instead of trying to debug SSSD which looked extremely time consuming.
+
+# Running a demo file
+
+To test the cluster, it’s useful to run some demo code. Since Keras is within TensorFlow from version 2.0 onward, there are two demo files under the folder ‘demo_files’. tf1_test.py is for TensorFlow 1.x, and tf2_test.py is for TensorFlow 2.x.
+
+To run the demo file, it’s best to first just run it with the system Python to see if it works. You can run `python tf2_test.py`, and if it works then you can proceed to the next step. If not, check the Python path (`which python`) to make sure it’s using the correct Python executable.
+
+To ensure you’re using the GPU and not CPU, you can run `nvidia-smi` to watch and make sure the GPU memory is getting used while running the file. `watch -n 0.1 nvidia-smi` will show the GPU memory updated every 0.1 second.
+
+Once the TensorFlow demo file works, you can try submitting it as a SLURM job. This uses the test.job file. Run `sbatch test.job`. Then you can check the status of the job with `sacct`. This should show ‘running’, and you should see GPU being used on one of the worker nodes. To specify the exact worker node being used, add a line to the .job file: `#SBATCH --nodelist=worker_name` where ‘worker_name’ is the name of the node. You should also be able to use `sinfo` to check which nodes are running jobs.

@@ -1,0 +1,8 @@
+#!/bin/bash
+#SBATCH -N 1      # nodes requested
+#SBATCH --job-name=test
+#SBATCH --output=./test.out
+#SBATCH --error=./test.err
+# the -u option means 'unbuffered',
+# which should continuously write output to the .out file
+nvidia-smi
