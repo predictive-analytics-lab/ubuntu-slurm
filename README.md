@@ -239,6 +239,7 @@ Name=mps Count=1000   File=/dev/nvidia3
 (I think `Cores` binds the GPU to specific CPUs.)
 
 As far as I can tell, `MPS` refers to an arbitrary number. In the examples it's kind of like percent, but it doesn't have to be that way. I propose to use GPU memory in GB.
+**Note:** while the number is basically arbitrary, there is still an upper limit. I suspect this has to do with how fine-grained a GPU can be partitioned. The limit likely depends on the GPU, but I've encountered 1024 as one upper limit.
 
 `slurm.conf` then needs to contain something like
 
