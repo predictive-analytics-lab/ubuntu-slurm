@@ -1,6 +1,6 @@
 # Installing SLURM
 
-Instructions for setting up a SLURM cluster using Ubuntu 18.04.3 with GPUs. Go from a pile of hardware to a functional GPU cluster with job queueing and user management.
+Instructions for setting up a SLURM cluster using Ubuntu 18.04.3 with GPUs. Go from a pile of hardware to a functional GPU cluster with job queueing.
 
 OS used: Ubuntu 18.04.3 LTS
 
