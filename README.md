@@ -256,7 +256,13 @@ Another thing that needs to be configured in `slurm.conf` are *ports*. Specify p
 
 This should probably be removed: `DefMemPerNode=64000`.
 
-These things might also be necessary to properly schedule GPUs: [https://github.com/dholt/slurm-gpu#scheduling-resources-at-the-per-gpu-level](https://github.com/dholt/slurm-gpu#scheduling-resources-at-the-per-gpu-level)
+### Scheduling jobs by CPU or by memory
+The `SelectTypeParameters` parameter determines whether jobs are primarily scheduled by requested number of CPU or by requested memory.
+The two values are `CR_Core` and `CR_Core_Memory`.
+If you choose `CR_Core_Memory`, then, by default, all jobs request *all* memory on a node.
+This means, in order to run multiple jobs per node at all, you need to then always specify `--mem=xxx` (where `xxx` is the requested memory in MB).
+
+### Distribute config
 
 Finally, we need to copy .conf files on **all** machines. This includes the `slurm.conf` file, `gres.conf`, `cgroup.conf` , and `cgroup_allowed_devices_file.conf`. Without these files it seems like things don’t work.
 
