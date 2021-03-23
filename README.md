@@ -262,6 +262,8 @@ The two values are `CR_Core` and `CR_Core_Memory`.
 If you choose `CR_Core_Memory`, then, by default, all jobs request *all* memory on a node.
 This means, in order to run multiple jobs per node at all, you need to then always specify `--mem=xxx` (where `xxx` is the requested memory in MB).
 
+However, we can use `DefMemPerCPU` and `DefMemPerGPU` to avoid having to specify `--mem` all the time.
+
 ### Distribute config
 
 Finally, we need to copy .conf files on **all** machines. This includes the `slurm.conf` file, `gres.conf`, `cgroup.conf` , and `cgroup_allowed_devices_file.conf`. Without these files it seems like things don’t work.
