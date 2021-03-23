@@ -250,9 +250,11 @@ GresTypes=gpu,mps
 NodeName=tux[0-7] Gres=gpu:tesla:2,gpu:kepler:2,mps:400
 ```
 
-Gres has more options detailed in the docs: https://slurm.schedmd.com/slurm.conf.html (near the bottom).
+(Gres has more options detailed in the docs: https://slurm.schedmd.com/slurm.conf.html (near the bottom).)
 
 Another thing that needs to be configured in `slurm.conf` are *ports*. Specify ports that are not blocked.
+`slurmctl` and `slurmdb` only run on the master node, so there is no need to open communication between those two for the firewall.
+`SlurmctldPort` definitely needs to be open; and `SlurmdPort` likely as well.
 
 This should probably be removed: `DefMemPerNode=64000`.
 
@@ -312,7 +314,7 @@ When in doubt, first try updating software with `sudo apt update; sudo apt upgra
 
 ## Log files
 
-When in doubt, you can check the log files. The locations are set in the slurm.conf file, and are `/var/log/slurmd.log` and `/var/log/slurmctld.log` by default. Open them with `sudo nano /var/log/slurmctld.log`. To go to the bottom of the file, use ctrl+_ and ctrl+v. I also changed the log paths to `/var/log/slurm/slurmd.log` and so on, and changed the permissions of the folder to be owner by slurm: `sudo chown slurm:slurm /var/log/slurm`.
+When in doubt, you can check the log files. The locations are set in the `slurm.conf` file, and are `/var/log/slurmd.log` and `/var/log/slurmctld.log` by default. Open them with `sudo nano /var/log/slurmctld.log`. To go to the bottom of the file, use ctrl+_ and ctrl+v. I also changed the log paths to `/var/log/slurm/slurmd.log` and so on, and changed the permissions of the folder to be owner by slurm: `sudo chown slurm:slurm /var/log/slurm`.
 
 ## Checking SLURM states
 
@@ -334,17 +336,15 @@ It could also mean your common storage location is not r/w accessible to all nod
 
 If the exit code is 2:0, this can mean there is some problem with either the location of the python executable, or some other error when running the python script. Double check that the srun or python script is working as expected with the python executable specified in the sbatch job file.
 
-### Restart nodes
-
-If some workers are ‘draining’, down, or unavailable, you might try:
-
-```
-scontrol update nodename=YOURNODEHERE state=resume
-```
-
 ## Node is stuck draining (drng from `sinfo`)
 
-This has happened due to the memory size in slurm.conf being higher than actual memor size. Double check the memory from `free -m` or `sudo slurmd -C` and update slurm.conf on all machines in the cluster. Then run `sudo scontrol update NodeName=worker1 State=RESUME`
+This has happened due to the memory size in slurm.conf being higher than actual memory size.
+(This can also happen with the MPS count.)
+Double check the memory (e.g., with `free -m` or `sudo slurmd -C`) and update slurm.conf on all machines in the cluster.
+Then run:
+```
+sudo scontrol update nodename=<nodename> state=resume
+```
 
 ## Nodes are not visible upon restart
 
@@ -368,17 +368,6 @@ You may want to limit jobs or submissions. Here is how to set attributes (-1 mea
 sudo sacctmgr modify account students set GrpJobs=-1sudo sacctmgr modify account students set GrpSubmitJobs=-1sudo sacctmgr modify account students set MaxJobs=-1sudo sacctmgr modify account students set MaxSubmitJobs=-1
 ```
 
-## FreeIPA Troubleshooting
-
-If you can’t access the FreeIPA admin web GUI, you may try changing permissions on the Kerberos folder as noted [here](https://scattered.network/2019/04/09/freeipa-webui-login-fails-with-login-failed-due-to-an-unknown-reason/).
-
-To get the machines to talk to each other with FreeIPA, you may also need to take some or all of these steps:
-
-- [Install a DNS service on the IPA server](https://docs.fedoraproject.org/en-US/Fedora/18/html/FreeIPA_Guide/enabling-dns.html)
-- [configure it to recognize the clients](https://www.howtoforge.com/how-to-install-freeipa-client-on-ubuntu-server-1804/#step-testing-freeipa-client)
-- This may also require enabling TCP and UDP traffic on port 53, and changing the [resolv.conf file on the clients](http://clusterfrak.com/sysops/app_installs/freeipa_clients/) to recognize the new name server on the server computer
-- change the /etc/nsswitch.conf file to include the line “initgroups: files sss”, and add several instances “sss” to [other lines in this file](https://bugzilla.redhat.com/show_bug.cgi?id=1366569)
-
 # Better sacct
 
 This shows all running jobs with the user who is running them.
@@ -391,45 +380,9 @@ More on sacct [here](https://slurm.schedmd.com/sacct.html).
 
 If the IP addresses of your machines change, you will need to update these in the file `/etc/hosts` on all machines and `/etc/exports` on the master node. It’s best to restart after making these changes.
 
-# NFS directory not showing up
-
-Check the service is running on the master node: `sudo systemctl status nfs-kernel-server.service`
-
-If it is not working, you may have a syntax error in your /etc/exports file. Rebooting after getting this working is a good idea. Not a bad idea to reboot the client computers as well.
-
-Once you have the service running on the master node, then see if you can manually mount the drive on the clients:
-
-`sudo mount master:/storage /storage`
-
-If it is hanging here, try mounting on the master server:
-
-`sudo mkdir /test` `sudo mount master:/storage /test`
-
-If this works, you might have an issue with ports being blocked or other connection issues between the master and clients.
-
-You should check your firewall status with `sudo ufw status`. You should see a rule allowing port 2049 access from your worker nodes. If you don’t have it, be sure to add it with `sudo ufw allow from <ip_addr> to any port nfs` then `sudo ufw reload`. You should use the IP and not the hostname. A reference for this is here.
-
 # Node not able to connect to slurmctld
 
 If a node isn’t able to connnect to the controller (server/master), first check that time is properly synced. Try using the `date` command to see if the times are synced across the servers.
-
-# Unable to uninstall and reinstall freeipa client
-
-If you are trying to uninstall the freeipa client and reinstall it and it fails (e.g. gives an error `The ipa-client-install command failed. See /var/log/ipaclient-install.log for more information`), you can try installing it with:
-
-```
-sudo ipa-client-install --hostname=`hostname -f` \
---mkhomedir --server=copper.regis.edu \
---domain regis.edu --realm REGIS.EDU --force-join
-```
-
-where the domain is your FQDN instead of regis.edu and instead of ‘copper’ you should use your server’s name.
-
-You might also try removing this file instead:
-
-`sudo rm /var/lib/ipa-client/sysrestore/sysrestore.state`
-
-However, when I was having this problem, it appeared to be some issue with the LDAP and SSSD not working. I ended up reformatting and reinstalling the OS on the problem machine instead of trying to debug SSSD which looked extremely time consuming.
 
 # Running a demo file
 
