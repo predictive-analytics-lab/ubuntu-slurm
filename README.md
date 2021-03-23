@@ -22,7 +22,7 @@ This wouldn’t have been possible without this [github repo](https://github.com
 
 ## Synchronizing time
 
-Free-IPA should take care of syncing time, so you shouldn’t have to worry about this if you setup freeipa. You can see if times are synced with the `date` command on the various machines.
+You can see if times are synced with the `date` command on the various machines.
 
 It’s not a bad idea to sync the time across the servers. [Here’s how](https://knowm.org/how-to-synchronize-time-across-a-linux-cluster/). One time when I set it up, it was ok, but another time the slurmctld service wouldn’t start and it was because the times weren’t synced.
 
