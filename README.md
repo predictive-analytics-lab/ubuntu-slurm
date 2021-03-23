@@ -4,6 +4,12 @@ Instructions for setting up a SLURM cluster using Ubuntu 18.04.3 with GPUs. Go f
 
 OS used: Ubuntu 18.04.3 LTS
 
+1. [Overview](#overview)
+2. [OS preparations](#os-preparations)
+3. [Preparing for SLURM installation](#preparing-for-slurm-installation)
+4. [Install SLURM](#install-slurm)
+5. [Troubleshooting](#troubleshooting)
+
 # Overview
 
 This guide will help you create and install a GPU HPC cluster with a job queue and user management. The idea is to have a GPU cluster which allows use of a few GPUs by many people. Using multiple GPUs at once is not the point here, and hasn’t been tested. This guide demonstrates how to create a GPU cluster for neural networks (deep learning) which uses Python and related neural network libraries (Tensorflow, Keras, Pytorch), CUDA, and NVIDIA GPU cards. You can expect this to take you a few days up to a week.
