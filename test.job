@@ -1,8 +1,9 @@
 #!/bin/bash
-#SBATCH -N 1      # nodes requested
-#SBATCH --job-name=test
-#SBATCH --output=./test.out
-#SBATCH --error=./test.err
-# the -u option means 'unbuffered',
-# which should continuously write output to the .out file
+# --- slurm settings ---
+#SBATCH --job-name=myjob
+#SBATCH --output=./myjob-%j.out
+#SBATCH --error=./myjob-%j.err
+# ----------------------
 nvidia-smi
+
+# python -u run.py config=value
