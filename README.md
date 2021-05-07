@@ -83,9 +83,7 @@ If you want, you can test munge: `munge -n | unmunge | grep STATUS`
 
 ## Prepare DB for SLURM
 
-These instructions more or less follow this github repo: https://github.com/mknoxnv/ubuntu-slurm
-
-First we want to clone the repo: `cd /storage` `git clone https://github.com/mknoxnv/ubuntu-slurm.git`
+First we want to clone this repo: `cd /storage` `git clone https://github.com/predictive-analytics-lab/ubuntu-slurm.git`
 
 Install prereqs:
 
@@ -124,6 +122,8 @@ Ideally you want to change the password to something different than `slurmdbpass
 
 ### Build the SLURM .deb install file
 
+**Note: be sure CUDA is installed before you build SLURM.** Otherwise the GPU functionality will not be available.
+
 It’s best to check the downloads page and use the latest version (right click link for download and use in the wget command). Ideally we’d have a script to scrape the latest version and use that dynamically.
 
 You can use the -j option to specify the number of CPU cores to use for ‘make’, like `make -j12`. `htop` is a nice package that will show usage stats and quickly show how many cores you have.
@@ -134,7 +134,7 @@ wget https://download.schedmd.com/slurm/slurm-20.11.5.tar.bz2
 tar xvjf slurm-20.11.5.tar.bz2
 cd slurm-20.11.5
 ./configure --prefix=/tmp/slurm-build --sysconfdir=/etc/slurm --enable-pam --with-pam_dir=/lib/x86_64-linux-gnu/security/ --without-shared-libslurm
-make
+make -j12
 make contrib
 make install
 cd ..
@@ -157,11 +157,18 @@ sudo chown slurm /var/spool/slurm/ctld /var/spool/slurm/d /var/log/slurm
 Copy slurm control and db services:
 
 ```
-sudo cp /storage/ubuntu-slurm/slurmdbd.service /etc/systemd/system/
-sudo cp /storage/ubuntu-slurm/slurmctld.service /etc/systemd/system/
+cd ubuntu-slurm
+sudo cp etc/systemd/system/slurmdbd.service /etc/systemd/system
+sudo cp etc/systemd/system/slurmctld.service /etc/systemd/system/
 ```
 
-The slurmdbd.conf file should be copied before starting the slurm services: `sudo cp /storage/slurmdbd.conf /etc/slurm/`
+The slurmdbd.conf file should be copied before starting the slurm services:
+
+```
+sudo cp etc/slutm/slurmdbd.conf /etc/slurm/
+sudo chown slurm /etc/slurm/slurmdbd.conf
+sudo chmod 600 /etc/slurm/slurmdbd.conf
+```
 
 Start the slurm services:
 
@@ -176,7 +183,7 @@ sudo systemctl start slurmctld
 If the master is also going to be a worker/compute node, you should do:
 
 ```
-sudo cp /storage/ubuntu-slurm/slurmd.service /etc/systemd/system/
+sudo cp etc/systemd/system/slurmd.service /etc/systemd/system/
 sudo systemctl enable slurmd
 sudo systemctl start slurmd
 ```
@@ -278,9 +285,9 @@ However, we can use `DefMemPerCPU` and `DefMemPerGPU` to avoid having to specify
 Finally, we need to copy .conf files on **all** machines. This includes the `slurm.conf` file, `gres.conf`, `cgroup.conf` , and `cgroup_allowed_devices_file.conf`. Without these files it seems like things don’t work.
 
 ```
-sudo cp /storage/ubuntu-slurm/cgroup* /etc/slurm/
-sudo cp /storage/slurm.conf /etc/slurm/
-sudo cp /storage/gres.conf /etc/slurm/
+sudo cp etc/slurm/cgroup* /etc/slurm/
+sudo cp etc/slurm/slurm.conf /etc/slurm/
+sudo cp etc/slurm/gres.conf /etc/slurm/
 ```
 
 This directory should also be created on workers:
