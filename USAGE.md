@@ -93,6 +93,7 @@ But what does the number ("4" in this case) mean?
 Well, it has no fixed meaning.
 When configuring one's SLURM installation, one can assign "MPS points" to each of the GPUs.
 It's completely arbitrary how many points are assigned to a given GPU.
+
 One way to do it (that's also mentioned in the documentation) is to assign 100 MPS points to each GPU.
 In this case, you can treat the points as percentages and do `--gres=mps:33` to request 33% of a GPU.
 However, that only really makes sense if all your GPUs are the same.
