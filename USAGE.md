@@ -2,6 +2,14 @@
 
 > How to use SLURM.
 
+- [Submitting jobs](#submitting-jobs)
+  - [Using a job script](#using-a-job-script)
+  - [`sbatch` configuration](#sbatch-configuration)
+  - [Using a library to submit jobs](#using-a-library-to-submit-jobs)
+- [Monitoring the queue](#monitoring-the-queue)
+- [Canceling a job](#canceling-a-job)
+
+
 ## Submitting jobs
 
 The basic action when using SLURM is submitting jobs so that they get added to the job queue and eventually run. Broadly, there are two ways to do this: either write a job script or use some library that submits the jobs for you.
