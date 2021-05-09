@@ -6,6 +6,7 @@
   - [Using a job script](#using-a-job-script)
   - [`sbatch` configuration](#sbatch-configuration)
   - [Using a library to submit jobs](#using-a-library-to-submit-jobs)
+  - [Specifying fractional GPUs](#specifying-fractional-gpus)
 - [Monitoring SLURM](#monitoring-slurm)
   - [Monitoring the queue](#monitoring-the-queue)
   - [Displaying more information about a specific job](#displaying-more-information-about-a-specific-job)
@@ -67,7 +68,7 @@ There are over 70 arguments for `sbatch` that can’t all be listed here. This i
 - `--gpu-bind`: bind the job to a specific GPU (see documentation for details)
 - `--gres=<list of resources>`:
   
-  `gres` is for specifying any required resource other than CPUs and main memory (RAM). In particular, this includes GPUs. To request a GPU, do `--gres=gpu:1`. If you know the type of GPU, you can be even more specific: `--gres=gpu:rtx_3090:1`. This can also be used to request a fraction of a GPU: `--gres=mps:3`; for more details on that, see below.
+  `gres` is for specifying any required resource other than CPUs and main memory (RAM). In particular, this includes GPUs. To request a GPU, do `--gres=gpu:1`. If you know the type of GPU, you can be even more specific: `--gres=gpu:rtx_3090:1`. This can also be used to request a fraction of a GPU: `--gres=mps:6`; for more details on that, [see below](#specifying-fractional-gpus).
 - `--job-name=<name>`: name of the job (this name shows up in the queue)
 - `--nodelist=<node name list>`: a comma-separated list of hosts that are acceptable for your job; for example: `--nodelist=goedel`
 - `--mem=<size[units]>`: specify the required memory (RAM) required
@@ -79,6 +80,26 @@ All these arguments can also be set with environment variables. See [the documen
 ### Using a library to submit jobs
 
 Instead of writing job files, you can use libraries to submit jobs for you. One such library is [submitit](https://github.com/facebookincubator/submitit) by Facebook. See [their documentation](https://github.com/facebookincubator/submitit/blob/master/docs/examples.md) to learn more.
+
+### Specifying fractional GPUs
+
+Nvidia has written a plugin for SLURM that allows specifying fractional (nvidia) GPUs as resources.
+However, the user experience is not the sleekest.
+First, the name: it's called [CUDA Multi-Process Service (MPS)](https://slurm.schedmd.com/gres.html#MPS_Management).
+Nothing in the name hints at fractional GPUs, but that's what they chose.
+In fact, they were seemingly so proud of the name, that the resource is also called `mps`.
+In order to request a fractional GPU, you specify something like `--gres=mps:4`.
+But what does the number ("4" in this case) mean?
+Well, it has no fixed meaning.
+When configuring ones SLURM installation, one can assign "MPS points" to each of the GPUs.
+It's completely arbitrary how many points are assigned to a given GPU.
+One possibility (that's also mentioned in the documentation) is to assign 100 MPS points to each GPU.
+In this case, you can treat the points as percentages and do `--gres=mps:33` to request 33% of a GPU.
+However, that only really makes sense if all your GPUs are the same.
+If you have different GPUs in your cluster, you might not want to give them all the same number of MPS points.
+So, the solution I came up with is to assign an MPS point for every GB of GRAM.
+So, if a GPU has 12GB of memory, it gets 12 MPS points and so on.
+Then, you can request `--gres=mps:6` and know that you will always get 6GB of GPU memory, no matter on which GPU your job ends up running.
 
 ## Monitoring SLURM
 ### Monitoring the queue
