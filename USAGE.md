@@ -91,7 +91,7 @@ In fact, they were seemingly so proud of the name, that the resource is also cal
 In order to request a fractional GPU, you specify something like `--gres=mps:4`.
 But what does the number ("4" in this case) mean?
 Well, it has no fixed meaning.
-When configuring ones SLURM installation, one can assign "MPS points" to each of the GPUs.
+When configuring one's SLURM installation, one can assign "MPS points" to each of the GPUs.
 It's completely arbitrary how many points are assigned to a given GPU.
 One possibility (that's also mentioned in the documentation) is to assign 100 MPS points to each GPU.
 In this case, you can treat the points as percentages and do `--gres=mps:33` to request 33% of a GPU.
