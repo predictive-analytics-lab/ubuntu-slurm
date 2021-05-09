@@ -65,7 +65,7 @@ There are over 70 arguments for `sbatch` that can’t all be listed here. This i
 - `--gpu-bind`: bind the job to a specific GPU (see documentation for details)
 - `--gres=<list of resources>`:
   
-  `gres` is for specifying any required resource other than CPUs and main memory (RAM). In particular, this includes GPUs. To request a GPU, do `--gres=gpu:1`. If you know the type of GPU, you can be even more specific: `--gres=gpu:nvidia_geforce_rtx_3090:1`. This can also be used to request a fraction of a GPU: `--gres=mps:3`; for more details on that, see below.
+  `gres` is for specifying any required resource other than CPUs and main memory (RAM). In particular, this includes GPUs. To request a GPU, do `--gres=gpu:1`. If you know the type of GPU, you can be even more specific: `--gres=gpu:rtx_3090:1`. This can also be used to request a fraction of a GPU: `--gres=mps:3`; for more details on that, see below.
 - `--job-name=<name>`: name of the job (this name shows up in the queue)
 - `--nodelist=<node name list>`: a comma-separated list of hosts that are acceptable for your job; for example: `--nodelist=goedel`
 - `--mem=<size[units]>`: specify the required memory (RAM) required
