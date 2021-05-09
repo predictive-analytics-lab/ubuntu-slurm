@@ -1,5 +1,6 @@
 #!/bin/bash
 # --- slurm settings ---
+#SBATCH --cpus-per-task=1
 #SBATCH --job-name=myjob
 #SBATCH --output=./myjob-%j.out
 #SBATCH --error=./myjob-%j.err
@@ -7,3 +8,4 @@
 nvidia-smi
 
 # python -u run.py config=value
+sleep 1000
