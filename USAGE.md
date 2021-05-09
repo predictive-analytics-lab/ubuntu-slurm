@@ -6,7 +6,9 @@
   - [Using a job script](#using-a-job-script)
   - [`sbatch` configuration](#sbatch-configuration)
   - [Using a library to submit jobs](#using-a-library-to-submit-jobs)
-- [Monitoring the queue](#monitoring-the-queue)
+- [Monitoring SLURM](#monitoring-slurm)
+  - [Monitoring the queue](#monitoring-the-queue)
+  - [Displaying more information about a specific job](#displaying-more-information-about-a-specific-job)
 - [Canceling a job](#canceling-a-job)
 
 
@@ -78,7 +80,8 @@ All these arguments can also be set with environment variables. See [the documen
 
 Instead of writing job files, you can use libraries to submit jobs for you. One such library is [submitit](https://github.com/facebookincubator/submitit) by Facebook. See [their documentation](https://github.com/facebookincubator/submitit/blob/master/docs/examples.md) to learn more.
 
-## Monitoring the queue
+## Monitoring SLURM
+### Monitoring the queue
 
 After you have submitted a job, you can check the job queue with `squeue`. The output looks something like this:
 
@@ -109,6 +112,12 @@ watch squeue
 ```
 
 for that. It refreshes every 2 seconds. You can exit it with ctrl-C.
+
+### Displaying more information about a specific job
+
+```
+scontrol show job <job id>
+```
 
 ## Canceling a job
 
