@@ -98,6 +98,7 @@ One way to do it (that's also mentioned in the documentation) is to assign 100 M
 In this case, you can treat the points as percentages and do `--gres=mps:33` to request 33% of a GPU.
 However, that only really makes sense if all your GPUs are the same.
 If you have different GPUs in your cluster, you might not want to give them all the same number of MPS points.
+
 So, the solution I came up with is to assign an MPS point for every GB of GRAM.
 So, if a GPU has 12GB of memory, it gets 12 MPS points and so on.
 Then, you can request `--gres=mps:6` and know that you will always get 6GB of GPU memory, no matter on which GPU your job ends up running.
