@@ -102,6 +102,7 @@ If you have different GPUs in your cluster, you might not want to give them all 
 So, the solution I came up with is to assign an MPS point for every GB of GRAM.
 So, if a GPU has 12GB of memory, it gets 12 MPS points and so on.
 Then, you can request `--gres=mps:6` and know that you will always get 6GB of GPU memory, no matter on which GPU your job ends up running.
+However, as MPS points are integers, under this setting it is not possible to request, for example, 6.5GB of memory.
 
 ## Monitoring SLURM
 ### Monitoring the queue
