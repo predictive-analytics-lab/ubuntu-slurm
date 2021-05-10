@@ -165,7 +165,7 @@ sudo cp etc/systemd/system/slurmctld.service /etc/systemd/system/
 The slurmdbd.conf file should be copied before starting the slurm services:
 
 ```
-sudo cp etc/slutm/slurmdbd.conf /etc/slurm/
+sudo cp etc/slurm/slurmdbd.conf /etc/slurm/
 sudo chown slurm /etc/slurm/slurmdbd.conf
 sudo chmod 600 /etc/slurm/slurmdbd.conf
 ```
