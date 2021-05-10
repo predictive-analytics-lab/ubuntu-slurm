@@ -70,9 +70,9 @@ There are over 70 arguments for `sbatch` that can’t all be listed here. This i
   
   `gres` is for specifying any required resource other than CPUs and main memory (RAM). In particular, this includes GPUs. To request a GPU, do `--gres=gpu:1`. If you know the type of GPU, you can be even more specific: `--gres=gpu:rtx_3090:1`. This can also be used to request a fraction of a GPU: `--gres=mps:6`; for more details on that, [see below](#specifying-fractional-gpus).
 - `--job-name=<name>`: name of the job (this name shows up in the queue)
-- `--nodelist=<node name list>`: a comma-separated list of hosts that are acceptable for your job; for example: `--nodelist=goedel`
 - `--mem=<size[units]>`: specify the required memory (RAM) required
 - `--output=<filename pattern>`: file where the standard output (and by default also standard error) is saved. You can use `%j` in the file name and it will be replaced by the job ID, and `%x` will be replaced by the job name. So, for example `--output=./logs/%x-%j.out`
+- `--partition=<partition name>`: specify the partition for the job. Partitions are kind of like different queues in SLURM. The partition affects where the job may run, what the time limit is, and what the default values for the resources are. In our case, there is a default partition called `all`, and each node has its own additional partition: `--partition=goedel`.
 - `--time=[D-][H:]M`: (`D`: days, `H`: hours, `M`: minutes, `[]` marks optional parts) set a run time limit for the job. If the job is still running by the time the limit runs out, the job is killed.
 
 All these arguments can also be set with environment variables. See [the documentation](https://slurm.schedmd.com/sbatch.html) for details on that.
