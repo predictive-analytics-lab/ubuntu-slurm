@@ -81,6 +81,8 @@ All these arguments can also be set with environment variables. See [the documen
 
 ### Starting template
 
+#### Full GPU
+
 ```sh
 #!/bin/bash
 # --- slurm settings ---
@@ -88,6 +90,27 @@ All these arguments can also be set with environment variables. See [the documen
 #SBATCH --gpus=1
 #SBATCH --job-name=example
 #SBATCH --output=./myjob-%j.out
+# ----------------------
+
+source ~/conda/env/...
+python -u experiment.py --some flag
+```
+
+#### 1/3 of a GPU
+
+In this case we have to specify the number of CPUs and the amount of RAM manually.
+
+```sh
+#!/bin/bash
+# --- slurm settings ---
+#SBATCH --partition=goedel
+# 8 GB of GPU memory:
+#SBATCH --gres=mps:8
+# 10 GB of (CPU) memory:
+#SBATCH --mem=10G
+#SBATCH --cpus-per-task=1
+#SBATCH --job-name=example
+#SBATCH --output=./logs/myjob-%j.out
 # ----------------------
 
 source ~/conda/env/...
