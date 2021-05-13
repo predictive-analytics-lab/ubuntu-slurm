@@ -125,7 +125,11 @@ However, as MPS points are integers, under this setting it is not possible to re
 ## Monitoring SLURM
 ### Monitoring the queue
 
-After you have submitted a job, you can check the job queue with `squeue`. The output looks something like this:
+After you have submitted a job, you can check the job queue with
+```
+squeue
+```
+The output looks something like this:
 
 ```
 JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
