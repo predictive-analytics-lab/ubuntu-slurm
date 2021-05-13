@@ -5,6 +5,7 @@
 - [Submitting jobs](#submitting-jobs)
   - [Using a job script](#using-a-job-script)
   - [`sbatch` configuration](#sbatch-configuration)
+  - [Starting template](#starting-template)
   - [Using a library to submit jobs](#using-a-library-to-submit-jobs)
   - [Specifying fractional GPUs](#specifying-fractional-gpus)
 - [Monitoring SLURM](#monitoring-slurm)
@@ -66,6 +67,7 @@ There are over 70 arguments for `sbatch` that can’t all be listed here. This i
 - `--export=ALL` or `--export=NONE`: specify whether environment variables from the current context are exported to the job script (default is `ALL`)
 - `--get-user-env`: set the enviroment variables the same as the submitting user’s login environment
 - `--gpu-bind`: bind the job to a specific GPU (see documentation for details)
+- `--gpus-per-task=<ngpus>`: how many GPUs to allocate for the job. This is less fine grained than `--gres` below
 - `--gres=<list of resources>`:
   
   `gres` is for specifying any required resource other than CPUs and main memory (RAM). In particular, this includes GPUs. To request a GPU, do `--gres=gpu:1`. If you know the type of GPU, you can be even more specific: `--gres=gpu:rtx_3090:1`. This can also be used to request a fraction of a GPU: `--gres=mps:6`; for more details on that, [see below](#specifying-fractional-gpus).
@@ -76,6 +78,22 @@ There are over 70 arguments for `sbatch` that can’t all be listed here. This i
 - `--time=[D-][H:]M`: (`D`: days, `H`: hours, `M`: minutes, `[]` marks optional parts) set a run time limit for the job. If the job is still running by the time the limit runs out, the job is killed.
 
 All these arguments can also be set with environment variables. See [the documentation](https://slurm.schedmd.com/sbatch.html) for details on that.
+
+### Starting template
+
+```sh
+#!/bin/bash
+# --- slurm settings ---
+#SBATCH --partition=goedel
+#SBATCH --gpus-per-task=1
+#SBATCH --cpus-per-task=3
+#SBATCH --job-name=myjob
+#SBATCH --output=./logs/myjob-%j.out
+# ----------------------
+
+source ~/conda/env/...
+python -u experiment.py --some flag
+```
 
 ### Using a library to submit jobs
 
