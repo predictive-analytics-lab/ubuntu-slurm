@@ -85,10 +85,11 @@ All these arguments can also be set with environment variables. See [the documen
 #!/bin/bash
 # --- slurm settings ---
 #SBATCH --partition=goedel
+#SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=3
 #SBATCH --job-name=myjob
-#SBATCH --output=./logs/myjob-%j.out
+#SBATCH --output=./myjob-%j.out
 # ----------------------
 
 source ~/conda/env/...
