@@ -72,6 +72,8 @@ sudo chmod 400 /storage/munge.key
 
 ## Install munge on worker nodes:
 
+(Make sure you have created the `munge` user before hand!)
+
 ```
 sudo apt-get install libmunge-dev libmunge2 munge
 sudo cp /storage/munge.key /etc/munge/munge.key
@@ -194,10 +196,17 @@ Now install SLURM on worker nodes:
 
 ```
 cd /storage
-sudo dpkg -i slurm-19.05.2_1.0_amd64.deb
-sudo cp /storage/ubuntu-slurm/slurmd.service /etc/systemd/system/
+sudo dpkg -i slurm-20.11.5_1.0_amd64.deb
+sudo cp etc/systemd/system/slurmd.service /etc/systemd/system/
 sudo systemctl enable slurmd
 sudo systemctl start slurmd
+```
+
+Make all the directories we need:
+
+```
+sudo mkdir -p /etc/slurm /etc/slurm/prolog.d /etc/slurm/epilog.d /var/spool/slurm/d /var/log/slurm
+sudo chown slurm /var/spool/slurm/d /var/log/slurm
 ```
 
 ## Configuring SLURM
@@ -288,13 +297,6 @@ Finally, we need to copy .conf files on **all** machines. This includes the `slu
 sudo cp etc/slurm/cgroup* /etc/slurm/
 sudo cp etc/slurm/slurm.conf /etc/slurm/
 sudo cp etc/slurm/gres.conf /etc/slurm/
-```
-
-This directory should also be created on workers:
-
-```
-sudo mkdir -p /var/spool/slurm/d
-sudo chown slurm /var/spool/slurm/d
 ```
 
 After the conf files have been copied to all workers and the master node, you may want to reboot the computers, or at least restart the slurm services:
