@@ -69,7 +69,7 @@ There are over 70 arguments for `sbatch` that can’t all be listed here. This i
 - `--dependency=afterok:<job_id>`: start the job only after the other job with ID `<job_id>` has finished successfully. For other kinds of dependency, see the documentation.
 - `--export=ALL` or `--export=NONE`: specify whether environment variables from the current context are exported to the job script (default is `ALL`)
 - `--get-user-env`: set the enviroment variables the same as the submitting user’s login environment
-- `--gpu-bind=<binding>`: bind the job to a specific GPU. For example, this should restrict your jobs to run on GPUs 0, 3 and 4: `--gpu-bind=map_gpu:0,3,4`. For more details see the documentation.
+- `--gpu-bind=<binding>`: bind the job to a specific GPU. For example, this should restrict your jobs to run on GPUs 0, 3 and 4: `--gpu-bind=map_gpu:0,3,4` (note the additional `map_gpu:` string). For more details see the documentation.
 - `--gpus-per-task=<ngpus>`: how many GPUs to allocate for the job. This is less fine grained than `--gres` below
 - `--gres=<list of resources>`:
   
