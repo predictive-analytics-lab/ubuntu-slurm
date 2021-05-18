@@ -6,6 +6,9 @@
   - [Using a job script](#using-a-job-script)
   - [`sbatch` configuration](#sbatch-configuration)
   - [Starting template](#starting-template)
+    - [Full GPU](#full-gpu)
+    - [1/3 of a GPU](#1-3-of-a-gpu)
+    - [Running `ray` inside of a SLURM job](#running-ray-inside-of-a-slurm-job)
   - [Using a library to submit jobs](#using-a-library-to-submit-jobs)
   - [Specifying fractional GPUs](#specifying-fractional-gpus)
 - [Monitoring SLURM](#monitoring-slurm)
@@ -92,7 +95,10 @@ All these arguments can also be set with environment variables. See [the documen
 #SBATCH --output=./myjob-%j.out
 # ----------------------
 
-source ~/conda/env/...
+# set up conda
+eval "$(conda shell.bash hook)"
+
+conda activate my_env
 python -u experiment.py --some flag
 ```
 
@@ -113,8 +119,32 @@ In this case we have to specify the number of CPUs and the amount of RAM manuall
 #SBATCH --output=./logs/myjob-%j.out
 # ----------------------
 
-source ~/conda/env/...
+# set up conda
+eval "$(conda shell.bash hook)"
+
+conda activate my_env
 python -u experiment.py --some flag
+```
+
+#### Running `ray` inside of a SLURM job
+
+```sh
+#!/bin/bash
+# --- slurm settings ---
+#SBATCH --partition=goedel
+#SBATCH --gpus=3
+#SBATCH --cpus-per-task=9
+#SBATCH --job-name=example
+#SBATCH --output=./myjob-%j.out
+# ----------------------
+
+# set up conda
+eval "$(conda shell.bash hook)"
+
+conda activate my_env
+ray start --head --num-cpus "${SLURM_CPUS_PER_TASK}" --num-gpus "${SLURM_GPUS_PER_TASK}"
+python -u experiment.py --some flag
+ray stop
 ```
 
 ### Using a library to submit jobs
