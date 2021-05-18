@@ -7,7 +7,7 @@
   - [`sbatch` configuration](#sbatch-configuration)
   - [Starting template](#starting-template)
     - [Full GPU](#full-gpu)
-    - [1/3 of a GPU](#1-3-of-a-gpu)
+    - [1/3 of a GPU](#13-of-a-gpu)
     - [Running `ray` inside of a SLURM job](#running-ray-inside-of-a-slurm-job)
   - [Using a library to submit jobs](#using-a-library-to-submit-jobs)
   - [Specifying fractional GPUs](#specifying-fractional-gpus)
