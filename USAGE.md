@@ -11,6 +11,7 @@
     - [Running `ray` inside of a SLURM job](#running-ray-inside-of-a-slurm-job)
   - [Using a library to submit jobs](#using-a-library-to-submit-jobs)
   - [Specifying fractional GPUs](#specifying-fractional-gpus)
+  - [Submitting multiple jobs in a bash loop](#submitting-multiple-jobs-in-a-bash-loop)
 - [Monitoring SLURM](#monitoring-slurm)
   - [Monitoring the queue](#monitoring-the-queue)
   - [Displaying more information about a specific job](#displaying-more-information-about-a-specific-job)
@@ -173,6 +174,33 @@ So, the solution I came up with is to assign an MPS point for every GB of GRAM.
 So, if a GPU has 12GB of memory, it gets 12 MPS points and so on.
 Then, you can request `--gres=mps:6` and know that you will always get 6GB of GPU memory, no matter on which GPU your job ends up running.
 However, as MPS points are integers, under this setting it is not possible to request, for example, 6.5GB of memory.
+
+### Submitting multiple jobs in a bash loop
+
+When you do
+```sh
+sbatch --gpus=1 --time=1:00 script.job arg another-arg yet-another-arg
+```
+then everything after `script.job` gets passed into the job script as commandline arguments.
+You can make use of that in order to submit several jobs in a queue.
+You would have a _submitter_ bash script that looks like this:
+```bash
+#!/bin/bash
+for seed in 3 4 5 6 7
+do
+    sbatch celeba.job data_split_seed=$seed
+done
+```
+and a job file that looks something like this:
+```sh
+#!/bin/bash
+#SBATCH --partition=goedel
+#SBATCH --gpus=1
+#SBATCH --job-name=george-celeba
+#SBATCH --output=./george-celeba-%j.out
+python -u run.py configs/celeba_george_config.json allow_multigpu=True "$@"
+```
+You can see there the `"$@"` which passes on all arguments that the job script got to the python script.
 
 ## Monitoring SLURM
 ### Monitoring the queue
