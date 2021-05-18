@@ -198,7 +198,7 @@ and a job file that looks something like this:
 #SBATCH --gpus=1
 #SBATCH --job-name=george-celeba
 #SBATCH --output=./george-celeba-%j.out
-python -u run.py configs/celeba_george_config.json allow_multigpu=True "$@"
+python -u run.py configs/celeba_george_config.json "$@"
 ```
 You can see there the `"$@"` which passes on all arguments that the job script got to the python script.
 
