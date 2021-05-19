@@ -133,19 +133,21 @@ python -u experiment.py --some flag
 #!/bin/bash
 # --- slurm settings ---
 #SBATCH --partition=goedel
-#SBATCH --gpus=3
+#SBATCH --gpus-per-task=3
 #SBATCH --cpus-per-task=9
-#SBATCH --job-name=example
-#SBATCH --output=./myjob-%j.out
+#SBATCH --mem=90G
+#SBATCH --job-name=ray-wrapper
+#SBATCH --output=./rayjob-%j.out
 # ----------------------
 
-# set up conda
-eval "$(conda shell.bash hook)"
-
-conda activate my_env
 ray start --head --num-cpus "${SLURM_CPUS_PER_TASK}" --num-gpus "${SLURM_GPUS_PER_TASK}"
-python -u experiment.py --some flag
+python -u "$@"
 ray stop
+```
+
+Usage:
+```sh
+sbatch ray.job experiment.py -m hydra/launcher=ray
 ```
 
 ### Using a library to submit jobs
