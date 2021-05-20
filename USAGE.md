@@ -133,6 +133,7 @@ python -u experiment.py --some flag
 #!/bin/bash
 # --- slurm settings ---
 #SBATCH --partition=goedel
+#SBATCH --ntasks=1
 #SBATCH --gpus-per-task=3
 #SBATCH --cpus-per-task=9
 #SBATCH --mem=90G
@@ -141,13 +142,14 @@ python -u experiment.py --some flag
 # ----------------------
 
 ray start --head --num-cpus "${SLURM_CPUS_PER_TASK}" --num-gpus "${SLURM_GPUS_PER_TASK}"
+
+# we just run here whatever is passed as arguments to this job script
 python -u "$@"
-ray stop
 ```
 
-Usage:
+Usage (if the above is saved to a file called `ray.job`):
 ```sh
-sbatch ray.job experiment.py -m hydra/launcher=ray
+sbatch ray.job experiment.py -m misc.seed=range(0,10)  hydra/launcher=ray
 ```
 
 ### Using a library to submit jobs
