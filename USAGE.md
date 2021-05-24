@@ -249,6 +249,11 @@ for that. It refreshes every 2 seconds. You can exit it with ctrl-C.
 scontrol show job <job id>
 ```
 
+The following displays the job script that was used to starta given job:
+```
+scontrol write batch_script <job id> -
+```
+
 ## Canceling a job
 
 ```
