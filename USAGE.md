@@ -6,11 +6,9 @@
   - [Using a job script](#using-a-job-script)
   - [`sbatch` configuration](#sbatch-configuration)
   - [Starting template](#starting-template)
-    - [Full GPU](#full-gpu)
-    - [1/3 of a GPU](#13-of-a-gpu)
-    - [Running `ray` inside of a SLURM job](#running-ray-inside-of-a-slurm-job)
   - [Using a library to submit jobs](#using-a-library-to-submit-jobs)
   - [Specifying fractional GPUs](#specifying-fractional-gpus)
+    - [Running `ray` inside of a SLURM job](#running-ray-inside-of-a-slurm-job)
   - [Submitting multiple jobs in a bash loop](#submitting-multiple-jobs-in-a-bash-loop)
 - [Monitoring SLURM](#monitoring-slurm)
   - [Monitoring the queue](#monitoring-the-queue)
@@ -74,7 +72,7 @@ There are over 70 arguments for `sbatch` that can’t all be listed here. This i
 - `--gpus-per-task=<ngpus>`: how many GPUs to allocate for the job. This is less fine grained than `--gres` below
 - `--gres=<list of resources>`:
   
-  `gres` is for specifying any required resource other than CPUs and main memory (RAM). In particular, this includes GPUs. To request a GPU, do `--gres=gpu:1`. If you know the type of GPU, you can be even more specific: `--gres=gpu:rtx_3090:1`. This can also be used to request a fraction of a GPU: `--gres=mps:6`; for more details on that, [see below](#specifying-fractional-gpus).
+  `gres` is for specifying any required resource other than CPUs and main memory (RAM). In particular, this includes GPUs. To request a GPU, do `--gres=gpu:1`. If you know the type of GPU, you can be even more specific: `--gres=gpu:rtx_3090:1`.
 - `--job-name=<name>`: name of the job (this name shows up in the queue)
 - `--mem=<size[units]>`: specify the required memory (RAM) required
 - `--output=<filename pattern>`: file where the standard output (and by default also standard error) is saved. You can use `%j` in the file name and it will be replaced by the job ID, and `%x` will be replaced by the job name. So, for example `--output=./logs/%x-%j.out`
@@ -84,8 +82,6 @@ There are over 70 arguments for `sbatch` that can’t all be listed here. This i
 All these arguments can also be set with environment variables. See [the documentation](https://slurm.schedmd.com/sbatch.html) for details on that.
 
 ### Starting template
-
-#### Full GPU
 
 ```sh
 #!/bin/bash
@@ -103,31 +99,21 @@ conda activate my_env
 python -u experiment.py --some flag
 ```
 
-#### 1/3 of a GPU
+### Using a library to submit jobs
 
-In this case we have to specify the number of CPUs and the amount of RAM manually.
+Instead of writing job files, you can use libraries to submit jobs for you. One such library is [submitit](https://github.com/facebookincubator/submitit) by Facebook. See [their documentation](https://github.com/facebookincubator/submitit/blob/master/docs/examples.md) to learn more.
 
-```sh
-#!/bin/bash
-# --- slurm settings ---
-#SBATCH --partition=goedel
-# 8 GB of GPU memory:
-#SBATCH --gres=mps:8
-# 10 GB of (CPU) memory:
-#SBATCH --mem=10G
-#SBATCH --cpus-per-task=1
-#SBATCH --job-name=example
-#SBATCH --output=./logs/myjob-%j.out
-# ----------------------
-
-# set up conda
-eval "$(conda shell.bash hook)"
-
-conda activate my_env
-python -u experiment.py --some flag
-```
+### Specifying fractional GPUs
+Nvidia has written a plugin for SLURM that allows specifying fractional (nvidia) GPUs as resources,
+but it sucks.
+For example, per node, you can only use one GPU as fractional at any given time.
+A better solution is to use `ray` inside the SLURM job.
 
 #### Running `ray` inside of a SLURM job
+The following job file starts up `ray` for the job, with the right parameters.
+In this example, we request 3 GPUs, 9 CPUs, and 90GB of RAM.
+`ray` can then automatically distribute jobs to the GPUs,
+and, crucially, can run multiple jobs per GPU.
 
 ```sh
 #!/bin/bash
@@ -149,35 +135,11 @@ python -u "$@"
 
 Usage (if the above is saved to a file called `ray.job`):
 ```sh
-sbatch ray.job experiment.py -m misc.seed=range(0,10)  hydra/launcher=ray
+sbatch ray.job experiment.py -m misc.seed=range(0,10) hydra/launcher=ray hydra.launcher.ray.remote.num_gpus=0.5
 ```
-
-### Using a library to submit jobs
-
-Instead of writing job files, you can use libraries to submit jobs for you. One such library is [submitit](https://github.com/facebookincubator/submitit) by Facebook. See [their documentation](https://github.com/facebookincubator/submitit/blob/master/docs/examples.md) to learn more.
-
-### Specifying fractional GPUs
-
-Nvidia has written a plugin for SLURM that allows specifying fractional (nvidia) GPUs as resources.
-However, the user experience is not the sleekest.
-First, the name: it's called [CUDA Multi-Process Service (MPS)](https://slurm.schedmd.com/gres.html#MPS_Management).
-Nothing in the name hints at fractional GPUs, but that's what they chose.
-In fact, they were seemingly so proud of the name, that the resource is also called `mps`.
-In order to request a fractional GPU, you specify something like `--gres=mps:4`.
-But what does the number ("4" in this case) mean?
-Well, it has no fixed meaning.
-When configuring one's SLURM installation, one can assign "MPS points" to each of the GPUs.
-It's completely arbitrary how many points are assigned to a given GPU.
-
-One way to do it (that's also mentioned in the documentation) is to assign 100 MPS points to each GPU.
-In this case, you can treat the points as percentages and do `--gres=mps:33` to request 33% of a GPU.
-However, that only really makes sense if all your GPUs are the same.
-If you have different GPUs in your cluster, you might not want to give them all the same number of MPS points.
-
-So, the solution I came up with is to assign an MPS point for every GB of GRAM.
-So, if a GPU has 12GB of memory, it gets 12 MPS points and so on.
-Then, you can request `--gres=mps:6` and know that you will always get 6GB of GPU memory, no matter on which GPU your job ends up running.
-However, as MPS points are integers, under this setting it is not possible to request, for example, 6.5GB of memory.
+Note that we have to specify the `ray` launcher here, and not the SLURM/submitit launcher.
+This is because the SLURM aspect is being taken care of by the job script, `ray.job`,
+and all we need to do now is start our jobs with `ray`.
 
 ### Submitting multiple jobs in a bash loop
 
